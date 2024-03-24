@@ -4,27 +4,20 @@ end
 
 function ReplayCmd(ply, cmd)
 	if not ply.ReplayRecording then return end
+	print(cmd:TickCount)
 	if cmd:TickCount() == 0 then return end
 
-	if not ply.ReplayFirstTick and cmd:TickCount() ~= 0 then
+	if not ply.ReplayFirstTick and cmd:TickCount() != 0 then
 		ply.ReplayFirstTick = cmd:TickCount()
 	end
 
 	local ang = cmd:GetViewAngles()
 
-	if ply.ReplayLastAng == ang then
-		ang = 0
-	else
-		ply.ReplayLastAng = ang
-	end
+	ply.ReplayLastAng = ang
 
 	local curtick = cmd:TickCount() - ply.ReplayFirstTick + 1
 
-	if ang == 0 then
-		ply.ReplayTicks[curtick] = {cmd:GetButtons(), cmd:GetForwardMove(), cmd:GetSideMove()}
-	else
-		ply.ReplayTicks[curtick] = {cmd:GetButtons(), ang.x, ang.y, cmd:GetForwardMove(), cmd:GetSideMove()}
-	end
+	ply.ReplayTicks[curtick] = {cmd:GetButtons(), ang.x, ang.y, cmd:GetForwardMove(), cmd:GetSideMove()}
 
 	if curtick > 23760 then
 		print("Replay recording stopped - too long")
@@ -33,11 +26,11 @@ function ReplayCmd(ply, cmd)
 	end
 end
 
-hook.Add("StartCommand", "ReplayStart", ReplayCmd)
+--hook.Add("StartCommand", "ReplayStart", ReplayCmd)
 
 function ReplayStart(ply)
-	if not game.SinglePlayer() then return end
-	if ply.InReplay then return end
+	--if not game.SinglePlayer() then return end
+	--if ply.InReplay then return end
 
 	print("Starting Replay")
 
@@ -49,9 +42,12 @@ function ReplayStart(ply)
 end
 
 function ReplayStop(ply, debugdump)
-	if not game.SinglePlayer() then return end
-	if not ply.ReplayTicks then return end
-	if ply.InReplay then return end
+	--if not game.SinglePlayer() then return end
+	if not ply.ReplayTicks then
+		ErrorNoHaltWithStack("No replay ticks found, aborting!")
+		return
+	end
+	--if ply.InReplay then return end
 
 	print("Ending Replay (" .. #ply.ReplayTicks .. "ticks)")
 
@@ -96,23 +92,15 @@ function ReplayPlayback(ply, cmd)
 		end
 
 		local tickdata = ply.ReplayTicks[tickcount]
-		local shortdata = #tickdata == 3
-		local ang = shortdata and 0 or Angle(tickdata[2], tickdata[3], cmd:GetViewAngles().z)
+		local ang = Angle(tickdata[2], tickdata[3], cmd:GetViewAngles().z)
 
-		if not shortdata then
-			ply.ReplayLastAng = ang
-		end
+		ply.ReplayLastAng = ang
 
 		cmd:SetButtons(tickdata[1])
 		cmd:SetViewAngles(ply.ReplayLastAng)
 
-		if shortdata then
-			cmd:SetForwardMove(tickdata[2])
-			cmd:SetSideMove(tickdata[3])
-		else
-			cmd:SetForwardMove(tickdata[4])
-			cmd:SetSideMove(tickdata[5])
-		end
+		cmd:SetForwardMove(tickdata[4])
+		cmd:SetSideMove(tickdata[5])
 
 		cmd:RemoveKey(IN_RELOAD)
 	elseif SERVER and cmdtc - firsttick + 1 > 0 or CLIENT and not ply:GetNWBool("InReplay") and RFF < CurTime() then
@@ -158,6 +146,20 @@ function ReplaySendToClient(ply)
 
 	hook.Add("StartCommand", "ReplayPlay", ReplayPlayback)
 end
+
+if SERVER then
+	hook.Add("Tick", "TickReplayRecord", function()
+		for _, v in ipairs(player.GetAll()) do
+			print(v:UserID())
+			if Player(v:UserID()).ReplayRecording then
+				print("attempting to record tick")
+				ReplayCmd(Player(v:UserID()), Player(v:UserID()):GetCurrentCommand())
+				--PrintTable(v.ReplayTicks)
+			end -- how not to record replays 101
+		end
+	end)
+end
+
 
 if CLIENT then
 	local tab = {
