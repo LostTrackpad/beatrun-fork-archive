@@ -5,9 +5,9 @@ end
 function ReplayCmd(ply, cmd)
 	if not ply.ReplayRecording then return end
 	print(cmd:TickCount)
-	if cmd:TickCount() == 0 then return end
+	--if cmd:TickCount() == 0 then return end
 
-	if not ply.ReplayFirstTick and cmd:TickCount() != 0 then
+	if not ply.ReplayFirstTick then
 		ply.ReplayFirstTick = cmd:TickCount()
 	end
 
@@ -128,8 +128,6 @@ function ReplayPlayback(ply, cmd)
 end
 
 function ReplaySendToClient(ply)
-	if not game.SinglePlayer() then return end
-
 	local replaydata = util.JSONToTable(util.Decompress(file.Read("beatrun/replays/" .. game.GetMap() .. "/replaydump.txt", "DATA")))
 
 	ply.ReplayFirstTick = false
