@@ -12,8 +12,8 @@ local slide_sounds = {
 }
 
 local slideloop_sounds = {
-	[0] = "mirrorsedge/Slide/ME_FootStep_ConcreteSlideLoop.wav",
-	[MAT_GLASS] = "mirrorsedge/Slide/ME_FootStep_GlassSlideLoop.wav"
+	[0] = "MirrorsEdge/Slide/ME_FootStep_ConcreteSlideLoop.wav",
+	[MAT_GLASS] = "MirrorsEdge/Slide/ME_FootStep_GlassSlideLoop.wav"
 }
 
 slide_sounds[MAT_GRASS] = slide_sounds[MAT_DIRT]
@@ -563,15 +563,15 @@ hook.Add("SetupMove", "qslide", function(ply, mv, cmd)
 			end
 		end
 
-		if not slippery then -- TODO: Find a way to make proper slide jump. It works on slippery because you are not holding Crouch for slippery objects
+		if not slippery then
 			if mv:KeyDown(IN_MOVELEFT) then
 				local ang = ply:GetSlidingAngle()
-				ang.y = ang.y + 0.5
+				ang.y = ang.y + 0.25
 
 				ply:SetSlidingAngle(ang)
 			elseif mv:KeyDown(IN_MOVERIGHT) then
 				local ang = ply:GetSlidingAngle()
-				ang.y = ang.y - 0.5
+				ang.y = ang.y - 0.25
 
 				ply:SetSlidingAngle(ang)
 			end
