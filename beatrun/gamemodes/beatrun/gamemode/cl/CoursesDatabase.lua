@@ -62,8 +62,8 @@ function GetCourse(sharecode)
 
 			return false
 		end
-	end, function(message)
-		print("An error occurred: " .. message)
+	end, function(e)
+		print("An error occurred: " .. e)
 
 		return false
 	end, {
@@ -82,7 +82,7 @@ function UploadCourse()
 
 	local url = domain:GetString() .. "/api/upload"
 	local data = file.Open("beatrun/courses/" .. currentMap .. "/" .. Course_ID .. ".txt", "rb", "DATA")
-	local filedata = util.Decompress(data:Read(data:Size())) or data:Read(data:Size())
+	local filedata = data:Read()
 
 	http.Post(url, NULL, function(body, length, headers, code)
 		local response = util.JSONToTable(body)
@@ -96,8 +96,8 @@ function UploadCourse()
 
 			return false
 		end
-	end, function(message)
-		print("Unexpected error: " .. message)
+	end, function(e)
+		print("Unexpected error: " .. e)
 	end, {
 		authorization = apikey:GetString(),
 		course = util.Base64Encode(filedata, true),
@@ -118,7 +118,7 @@ function UpdateCourse(course_code)
 
 	local url = domain:GetString() .. "/api/update"
 	local data = file.Open("beatrun/courses/" .. currentMap .. "/" .. Course_ID .. ".txt", "rb", "DATA")
-	local filedata = util.Decompress(data:Read(data:Size())) or data:Read(data:Size())
+	local filedata = data:Read()
 
 	http.Post(url, NULL, function(body, length, headers, code)
 		local response = util.JSONToTable(body)
@@ -128,12 +128,12 @@ function UpdateCourse(course_code)
 
 			return true
 		else
-			print("An error occurred: " .. message)
+			print("An error occurred: " .. response.message)
 
 			return false
 		end
-	end, function(message)
-		print("Unexpected error: " .. message)
+	end, function(e)
+		print("Unexpected error: " .. e)
 	end, {
 		authorization = apikey:GetString(),
 		code = course_code,
