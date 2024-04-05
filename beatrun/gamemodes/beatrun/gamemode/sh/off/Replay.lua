@@ -1,18 +1,19 @@
 if SERVER then
 	util.AddNetworkString("ReplaySendToClient")
-	util.AddNetworkString("ReplayReturnToClient")
-	util.AddNetworkString("PlayerRequestedReplay")
 end
 
 function ReplayCmd(ply, cmd)
 	if not ply.ReplayRecording then return end
-	if cmd:TickCount() == 0 then return end
+	print(cmd:TickCount)
+	--if cmd:TickCount() == 0 then return end
 
-	if not ply.ReplayFirstTick and cmd:TickCount() ~= 0 then
+	if not ply.ReplayFirstTick then
 		ply.ReplayFirstTick = cmd:TickCount()
 	end
 
 	local ang = cmd:GetViewAngles()
+
+	ply.ReplayLastAng = ang
 
 	local curtick = cmd:TickCount() - ply.ReplayFirstTick + 1
 
@@ -25,14 +26,14 @@ function ReplayCmd(ply, cmd)
 	end
 end
 
-hook.Add("StartCommand", "ReplayStart", ReplayCmd)
+--hook.Add("StartCommand", "ReplayStart", ReplayCmd)
 
 function ReplayStart(ply)
 	--if not game.SinglePlayer() then return end
+	--if ply.InReplay then return end
 
 	print("Starting Replay")
 
-	ply.InReplay = false
 	ply.ReplayRecording = true
 	ply.ReplayTicks = {}
 	ply.ReplayFirstTick = false
@@ -42,7 +43,11 @@ end
 
 function ReplayStop(ply, debugdump)
 	--if not game.SinglePlayer() then return end
-	if not ply.ReplayTicks then return end
+	if not ply.ReplayTicks then
+		ErrorNoHaltWithStack("No replay ticks found, aborting!")
+		return
+	end
+	--if ply.InReplay then return end
 
 	print("Ending Replay (" .. #ply.ReplayTicks .. "ticks)")
 
@@ -56,21 +61,6 @@ function ReplayStop(ply, debugdump)
 
 	file.CreateDir(dir)
 	file.Write(dir .. "replaydump.txt", replay)
-	ReplaySendToClient(ply)
-end
-
-function ReplayStartPlaying(ply) -- i suck at naming stuff
-	ply.InReplay = true
-	ply.ReplayRecording = false
-	
-	local dir = "beatrun/replays/" .. game.GetMap() .. "/"
-	local replay = file.Read(dir .. "replaydump.txt")
-	replay = replay and util.JSONToTable(util.Decompress(replay))
-	ply.ReplayStartPos = replay[1]
-	ply.ReplayTicks = replay[2]
-
-	ply:Spawn()
-	ReplayReturnToClient(ply)
 end
 
 local RFF = true
@@ -102,13 +92,12 @@ function ReplayPlayback(ply, cmd)
 		end
 
 		local tickdata = ply.ReplayTicks[tickcount]
-
 		local ang = Angle(tickdata[2], tickdata[3], cmd:GetViewAngles().z)
 
+		ply.ReplayLastAng = ang
+
 		cmd:SetButtons(tickdata[1])
-		PrintTable(tickdata)
-		cmd:SetViewAngles(ang)
-		ply:SetEyeAngles(ang)
+		cmd:SetViewAngles(ply.ReplayLastAng)
 
 		cmd:SetForwardMove(tickdata[4])
 		cmd:SetSideMove(tickdata[5])
@@ -139,8 +128,6 @@ function ReplayPlayback(ply, cmd)
 end
 
 function ReplaySendToClient(ply)
-	--if not game.SinglePlayer() then return end
-
 	local replaydata = util.JSONToTable(util.Decompress(file.Read("beatrun/replays/" .. game.GetMap() .. "/replaydump.txt", "DATA")))
 
 	ply.ReplayFirstTick = false
@@ -149,20 +136,6 @@ function ReplaySendToClient(ply)
 	ply:SetNWBool("InReplay", true)
 
 	net.Start("ReplaySendToClient")
-	net.Send(ply)
-end
-
-function ReplayReturnToClient(ply)
-	--if not game.SinglePlayer() then return end
-
-	local replaydata = util.JSONToTable(util.Decompress(file.Read("beatrun/replays/" .. game.GetMap() .. "/replaydump.txt", "DATA")))
-
-	ply.ReplayFirstTick = false
-	ply.ReplayStartPos = replaydata[1]
-	ply.ReplayTicks = replaydata[2]
-	ply:SetNWBool("InReplay", true)
-
-	net.Start("ReplayReturnToClient")
 	net.Send(ply)
 
 	ply.InReplay = true
@@ -173,27 +146,18 @@ function ReplayReturnToClient(ply)
 end
 
 if SERVER then
-	--hook.Add("Tick", "TickReplayRecord", function()
-	--	for _, v in ipairs(player.GetAll()) do
-	--		print(v:UserID())
-	--		if Player(v:UserID()).ReplayRecording then
-	--			print("attempting to record tick")
-	--			ReplayCmd(Player(v:UserID()), Player(v:UserID()):GetCurrentCommand())
-	--			--PrintTable(v.ReplayTicks)
-	--		end -- how not to record replays 101
-	--	end
-	--end)
-	function GM:SetupMove(ply, mv, cmd)
-		if ply.ReplayRecording then
-			ReplayCmd(ply, cmd)
-			--PrintTable(v.ReplayTicks)
-		end -- how not to record replays 101
-	end
-
-	net.Receive("PlayerRequestedReplay", function(len, ply)
-		ReplayStartPlaying(ply)
+	hook.Add("Tick", "TickReplayRecord", function()
+		for _, v in ipairs(player.GetAll()) do
+			print(v:UserID())
+			if Player(v:UserID()).ReplayRecording then
+				print("attempting to record tick")
+				ReplayCmd(Player(v:UserID()), Player(v:UserID()):GetCurrentCommand())
+				--PrintTable(v.ReplayTicks)
+			end -- how not to record replays 101
+		end
 	end)
 end
+
 
 if CLIENT then
 	local tab = {
@@ -209,7 +173,7 @@ if CLIENT then
 	}
 
 	local function BeatrunReplayVision()
-		if LocalPlayer().InReplay then
+		if LocalPlayer().ReplayFirstTick then
 			DrawColorModify(tab)
 		end
 	end
@@ -242,18 +206,14 @@ if CLIENT then
 	net.Receive("ReplayRequest", ReplayBegin)
 
 	net.Receive("ReplaySendToClient", function(length)
-		LocalPlayer().ReplayTicks = util.JSONToTable(util.Decompress(net.ReadData(length)))
-	end)
+		if length < 100 then
+			LocalPlayer().ReplayTicks = util.JSONToTable(util.Decompress(file.Read("beatrun/replays/" .. game.GetMap() .. "/replaydump.txt", "DATA")))[2]
+		else
+			LocalPlayer().ReplayTicks = util.JSONToTable(util.Decompress(net.ReadData(length)))
+		end
 
-	net.Receive("ReplayReturnToClient", function(length)
-		LocalPlayer().ReplayTicks = util.JSONToTable(util.Decompress(net.ReadData(length)))
 		LocalPlayer().ReplayFirstTick = false
 		ReplayBegin()
-	end)
-
-	concommand.Add("Beatrun_RequestReplay", function(ply)
-		net.Start("PlayerRequestedReplay")
-		net.SendToServer()
 	end)
 end
 

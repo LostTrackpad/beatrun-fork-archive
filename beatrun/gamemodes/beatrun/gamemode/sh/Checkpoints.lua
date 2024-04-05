@@ -137,6 +137,8 @@ if CLIENT then
 			LocalPlayer():EmitSound("A_TT_Finish_Negative.wav")
 		end
 
+		SaveReplayData()
+
 		net.Start("Checkpoint_Finish")
 			net.WriteFloat(totaltime)
 		net.SendToServer()
