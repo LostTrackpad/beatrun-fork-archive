@@ -1,6 +1,6 @@
 VERSIONGLOBAL = "v1.0?"
 
-DeriveGamemode("sandbox")
+--DeriveGamemode("sandbox")
 
 GM.Name = "Beatrun"
 GM.Author = "who cares"
