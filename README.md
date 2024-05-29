@@ -1,3 +1,6 @@
+## This is a full archive of my original Beatrun fork. I won't be working on this.
+
+
 # Beatrun | Community edition
 
 * [Русский](./README_ru.md)
